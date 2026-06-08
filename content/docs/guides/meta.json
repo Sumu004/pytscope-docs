@@ -1,0 +1,9 @@
+{
+  "title": "Guides",
+  "pages": [
+    "index",
+    "instrumenting-your-loop",
+    "integrations",
+    "cli-reference"
+  ]
+}

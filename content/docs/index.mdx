@@ -1,0 +1,77 @@
+---
+title: Introduction
+description: pytscope is an intelligence layer for ML training — see why your run is slow, not just that it is.
+---
+
+import { Card, Cards } from 'fumadocs-ui/components/card';
+import { Callout } from 'fumadocs-ui/components/callout';
+
+`pytscope` watches your training loop, then tells you in plain language what's
+slowing it down and how to fix it — not just a wall of numbers. It puts every
+signal — timing, memory, convergence, distributed behavior — on **one aligned
+per-step timeline**, so its diagnosis engine can correlate events that no
+single-axis profiler can see together, and turn them into ranked, actionable
+findings.
+
+```text
+● TIMING — 95 steps · 23.1 ms/step · 43.3 steps/s
+  data       ████████████████░░░░░░░░░░░░░░  52.0%
+  forward    █████████░░░░░░░░░░░░░░░░░░░░░  17.3%
+  backward   ██████████████░░░░░░░░░░░░░░░░  26.0%
+  optimizer  █░░░░░░░░░░░░░░░░░░░░░░░░░░░░░   4.3%
+
+● FINDINGS (1)
+  [HIGH] Input pipeline is a bottleneck  (TIMING.DATALOADER_BOUND)
+        52% of step time is spent fetching data. The accelerator is
+        stalling on the dataloader.
+        -> Raise DataLoader num_workers, set persistent_workers=True
+           and pin_memory=True, or move heavy transforms off the hot path.
+```
+
+<Callout title="In a real terminal">
+  Each `●` lights up red, amber, or green — a clean, glanceable "hardware
+  panel" view of your run, with zero changes to your training loop.
+</Callout>
+
+## Where to start
+
+<Cards>
+  <Card title="Quickstart" href="/docs/quickstart">
+    Install pytscope, instrument a loop in one line, and read your first
+    report — in about a minute.
+  </Card>
+  <Card title="Features" href="/docs/features">
+    The six analysis lenses — timing, memory, convergence, cross-signal,
+    distributed, efficiency budget — what each catches and how to use it.
+  </Card>
+  <Card title="Guides" href="/docs/guides">
+    Instrument a custom loop, wire up Lightning / Hugging Face callbacks,
+    and drive the `analyze` / `diff` CLI.
+  </Card>
+  <Card title="Architecture" href="/docs/concepts/architecture">
+    The one-timeline design: how collectors, analyzers, and the diagnosis
+    engine fit together.
+  </Card>
+</Cards>
+
+## Why one timeline
+
+Standard tools profile one axis — timing, *or* gradients, *or* logged scalars —
+in isolation. pytscope's analyzers all read the same `StepRecord` stream, so
+its diagnosis engine can flag things no single-axis tool can see, like:
+
+```text
+● FINDINGS (1)
+  [HIGH] Correlated instability at steps 70–72  (CROSS.CORRELATED_INSTABILITY)
+        3 independent signals spike together (loss, grad_norm, step_time).
+        That co-occurrence is strong evidence of a real optimization
+        event — not noise.
+        -> Check your LR schedule and gradient clipping around steps 70–72.
+```
+
+## Status
+
+Validated on real multi-GPU NCCL hardware (2× T4): straggler detection and
+exposed-communication analysis both confirmed on real runs — see
+[Validation](/docs/validation). DDP is first-class today; FSDP / tensor
+parallelism are on the roadmap.

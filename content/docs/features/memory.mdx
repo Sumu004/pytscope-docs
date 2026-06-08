@@ -1,0 +1,27 @@
+---
+title: Memory
+description: Peak usage, fragmentation, and leak/growth detection on CUDA and Apple MPS.
+---
+
+The memory analyzer captures device memory alongside the timing timeline —
+CUDA's true in-step peak via `torch.cuda.max_memory_allocated`, or an Apple
+MPS resident-memory sample — so memory and timing land on the *same* per-step
+clock and can be correlated by the diagnosis engine.
+
+## What it catches
+
+- **Peak usage** — the high-water mark across the run, and which step it
+  occurred on
+- **Fragmentation** — gaps between allocated and reserved memory that signal
+  the allocator is struggling
+- **Leaks / growth** — a persistent upward trend in per-step memory that
+  doesn't plateau, the signature of a real leak rather than warm-up
+
+```bash
+pip install "pytscope[torch]"
+python examples/pytorch_real.py --leak && pytscope analyze runs/pytorch
+```
+
+That command runs a real PyTorch loop with an injected memory leak and prints
+a `MEMORY.LEAK` finding naming the step where growth becomes persistent —
+on real CUDA / MPS / CPU hardware, auto-detected.

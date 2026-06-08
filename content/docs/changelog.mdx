@@ -1,0 +1,89 @@
+---
+title: Changelog
+description: What's new in each pytscope release.
+full: true
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+<Callout title="Source of truth">
+  This page mirrors [`CHANGELOG.md`](https://github.com/Sumu004/pytscope/blob/main/CHANGELOG.md)
+  in the repo, which follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
+  and [Semantic Versioning](https://semver.org/spec/v2.0.0.html). For the
+  fully up-to-date version, see the file directly or the
+  [GitHub releases](https://github.com/Sumu004/pytscope/releases).
+</Callout>
+
+## [0.2.1] — 2026-06-08
+
+**Changed**
+- **Project renamed from `trainscope` to `pytscope`.** Both `trainscope` and
+  `tscope` were already taken on PyPI; `pytscope` was available. The import
+  path, CLI command, PyPI distribution name, and GitHub repository
+  (`Sumu004/pytscope`) are now all `pytscope`. No functional changes — this
+  release exists solely to publish under the new name.
+
+## [0.2.0] — 2026-06-08
+
+**Added**
+- **Amber-LED "hardware panel" terminal reports.** `analyze`/`diff` now
+  render every section as a lit panel — a colored `●` indicator, gradient
+  meter bars (`█`/`░`), severity-coded findings, and unicode sparklines for
+  step-time and loss trends. Auto-detects color support
+  (`NO_COLOR`/`FORCE_COLOR`/`--color`), degrades to byte-identical plain text
+  when piped.
+- **Training Efficiency Budget (MFU)** — exact wall-time decomposition
+  anchored by Model FLOPs Utilization. FLOPs counted automatically via
+  `AutoProfiler(measure_flops=True)`; `EFFICIENCY.LOW_MFU` /
+  `EFFICIENCY.RECOVERABLE` rules point at the biggest win.
+- **Exposed-communication analysis** — ingest a `torch.profiler`/Kineto
+  trace and compute, via exact interval arithmetic, how much collective
+  communication overlaps compute vs. is exposed; new `DIST.EXPOSED_COMM`
+  rule.
+- **Automatic instrumentation (`AutoProfiler`)** — full phase timeline with
+  zero loop changes, via forward hooks + optimizer wrapper + collective
+  patching.
+- **Distributed vertical** — multi-rank critical-path analysis, statistical
+  straggler detection (`DIST.STRAGGLER`, `DIST.LOAD_IMBALANCE`,
+  `DIST.COMM_BOUND`), and a pipeline-bubble analyzer (`DIST.PIPELINE_BUBBLE`).
+- Real `examples/ddp_gloo.py` — genuine multi-process gloo DDP with an
+  injectable straggler.
+
+**Validated**
+- Real multi-GPU NCCL run (Kaggle, 2× T4) — see [Validation](/docs/validation).
+
+**Fixed**
+- `examples/efficiency_mfu.py` now selects CUDA correctly (was silently
+  profiling CPU and reporting a meaningless ~0% MFU).
+- CLI no longer crashes on Windows when a report contains `Δ`/`—`/`•`
+  (`UnicodeEncodeError` under `cp1252`) — `pytscope.cli.main` now re-points
+  stdout/stderr at UTF-8 with `errors="replace"`.
+
+**Changed**
+- AutoProfiler is now correct under gradient accumulation and activation
+  checkpointing (forward re-entrancy guard).
+- Packaging: version is now single-sourced from `pytscope.__version__`
+  (Hatch dynamic version); `docs/` added to the sdist.
+
+## [0.1.0] — 2026-06-06
+
+First public beta. One telemetry backbone feeding four analysis verticals
+plus a cross-signal diagnosis engine.
+
+**Added**
+- **Profiler** — live, integer-nanosecond timing core with `step()` /
+  `mark()` primitives, `iter_data()` dataloader timing, scalar logging, and
+  optional device-memory capture. ~3 µs/step overhead.
+- **Integrations** — one-line PyTorch Lightning and Hugging Face `Trainer`
+  callbacks; DDP rank-aware.
+- **Timing vertical** — per-step attribution with rules for dataloader-bound,
+  backward-heavy, optimizer-heavy, and jitter.
+- **Memory vertical** — CUDA + Apple MPS capture; fragmentation and
+  leak/growth detection.
+- **Convergence vertical** — loss trend, divergence (NaN/Inf), and robust
+  local-window spike detection.
+- **Cross-signal rule** — correlates spikes across loss / grad-norm /
+  step-time / memory on one aligned timeline.
+- **Reproducibility vertical** — `pytscope diff A B`.
+- **CLI** — `pytscope analyze` and `pytscope diff`.
+- Pure-stdlib core; CUDA/MPS/CPU examples; 58 tests.

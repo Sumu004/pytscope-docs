@@ -1,0 +1,43 @@
+---
+title: Efficiency budget
+description: An exact wall-time decomposition, anchored to Model FLOPs Utilization (MFU).
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+The efficiency budget is a single accounting identity: it decomposes
+attributed wall time into named line items — useful compute, compute
+overhead, data stall, communication, other — that sum **exactly** to your
+measured wall time, anchored at the top by Model FLOPs Utilization (MFU).
+
+```text
+● EFFICIENCY BUDGET — wall-time decomposition
+  MFU 38.0%  ·  useful compute 38.0% of 142.00s wall
+  useful_compute    ███████████░░░░░░░░░░░░░░░░░░  38.0%
+  data_stall        ████████░░░░░░░░░░░░░░░░░░░░░  27.0%  (recoverable)
+  communication     █████░░░░░░░░░░░░░░░░░░░░░░░░  19.0%  (recoverable)
+
+  [HIGH] MFU is 38% — 62% of wall is recoverable  (EFFICIENCY.LOW_MFU)
+        Biggest win: data_stall at 27% of wall.
+        -> Start there: raise num_workers, persistent_workers, prefetch.
+```
+
+FLOPs are counted automatically via `AutoProfiler(measure_flops=True)`
+(backed by `torch.utils.flop_counter.FlopCounterMode`); peak throughput comes
+from a built-in GPU table (`hardware.peak_flops_for`) or an explicit
+`--peak-tflops`. Recoverable line items are ranked by payoff —
+`EFFICIENCY.LOW_MFU` (anchored to a hardware peak) and
+`EFFICIENCY.RECOVERABLE` (no anchor needed) point you at the biggest win
+first.
+
+```bash
+pytscope analyze runs/exp1 --flops-per-step --peak-tflops 312
+```
+
+<Callout title="Reproduce it">
+```bash
+python examples/efficiency_mfu.py && pytscope analyze runs/mfu
+```
+</Callout>
+
+Every line is exact — they sum to your measured wall time, no fudge factor.

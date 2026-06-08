@@ -1,0 +1,12 @@
+{
+  "title": "Features",
+  "pages": [
+    "index",
+    "timing",
+    "memory",
+    "convergence",
+    "cross-signal",
+    "distributed",
+    "efficiency-budget"
+  ]
+}

@@ -1,0 +1,86 @@
+---
+title: Architecture
+description: One aligned per-step timeline feeds pluggable analyzers and a diagnosis engine.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+pytscope is built around a single idea: **put every signal on one aligned
+per-step timeline, then reason across signals.** Standard tools profile one
+axis (timing, or gradients, or logged scalars) in isolation. Because every
+analyzer reads the same `StepRecord` stream, the diagnosis engine can
+correlate events that no single-axis tool can see together.
+
+![pytscope pipeline: training loop → collectors → one aligned timeline → analyzers → diagnosis engine → report](/architecture.png)
+
+```text
+training loop
+   │  (Profiler primitives: iter_data / step / mark / log)
+   ▼
+collectors ──► RunStore  (steps.jsonl, append-only, aligned timeline)
+                   │
+                   ▼
+        analyzers  (timing | memory | convergence | distributed | ...)
+                   │   each: List[StepRecord] → typed summary dataclass
+                   ▼
+        diagnosis engine  (@rule functions → ranked Findings)
+                   │
+                   ▼
+            reporters  (CLI today; HTML/markdown extensible)
+```
+
+## Layers
+
+### 1. Profiler
+
+The live runtime object. Timing uses **integer nanoseconds**
+(`time.perf_counter_ns`) end-to-end and converts to seconds exactly once, at
+the step boundary — avoiding float catastrophic cancellation on
+sub-millisecond phases. It optionally captures device memory (CUDA true
+in-step peak; Apple MPS resident sample) and is DDP rank-aware. The clock is
+injectable for deterministic tests. Overhead: ~0.7 µs/step instrumented,
+~3 µs/step including the JSONL write.
+
+### 2. Telemetry backbone
+
+- The `StepRecord` schema — step index, phase durations, scalars, memory,
+  timestamp — and canonical phase ordering
+- `RunStore` — an append-only `steps.jsonl` writer/reader that's the single
+  source of truth every analyzer reads from
+
+### 3. Analyzers
+
+Each analyzer is a pure function: `List[StepRecord] → TypedSummary`. Six
+verticals ship today — timing, memory, convergence, cross-signal, distributed,
+and efficiency budget — see [Features](/docs/features) for what each one
+catches.
+
+### 4. Diagnosis engine
+
+`@rule`-decorated functions receive a `DiagnosisContext` (the summaries from
+every analyzer that ran) and yield `Finding`s — each with a severity
+(`high`/`med`/`low`), a plain-language explanation, and a concrete fix. The
+engine ranks and dedupes findings across all verticals before handing them to
+the reporter.
+
+### 5. Reporters
+
+The CLI renders an ANSI "hardware panel" report by default — colored `●`
+indicators, gradient meter bars, sparklines — and degrades to byte-identical
+plain text when piped, redirected, or explicitly disabled (`--color never`,
+`NO_COLOR`). The reporter layer is intentionally thin, so HTML/Markdown
+output is a small, additive change.
+
+<Callout title="Adding a new diagnosis rule">
+  Pure-stdlib core, ~3 µs/step overhead — small enough to leave on by default.
+  Adding a new rule is one decorated function; see
+  [CONTRIBUTING](https://github.com/Sumu004/pytscope/blob/main/CONTRIBUTING.md).
+</Callout>
+
+## Why this design
+
+A finding like `CROSS.CORRELATED_INSTABILITY` — "loss, grad_norm, and
+step_time all spiked at step 71" — is *only* expressible if all three signals
+live on the same clock. Bolting a memory profiler onto a separate timing tool
+after the fact can't produce it; the correlation has to be structural, not
+post-hoc.

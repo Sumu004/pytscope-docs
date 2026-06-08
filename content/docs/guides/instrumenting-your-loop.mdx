@@ -1,0 +1,93 @@
+---
+title: Instrumenting your loop
+description: AutoProfiler vs. manual Profiler — which to use, and how each one works.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+pytscope gives you two ways to capture a run. Both write the same
+`StepRecord` timeline to a `RunStore`, so `analyze` and `diff` work
+identically regardless of which one you used.
+
+## AutoProfiler — zero changes to your loop
+
+`AutoProfiler(run_dir, model, optimizer)` captures the full phase timeline
+(`data` / `forward` / `backward` / `optimizer`, plus synchronous `comm`) with
+**no changes to your training loop**, via:
+
+- PyTorch forward hooks (times `forward`)
+- an `optimizer.step` wrapper (times `optimizer`, and closes the step)
+- collective patching (captures `comm` for distributed runs)
+- a forward re-entrancy guard, so gradient accumulation records one step per
+  `optimizer.step` — not per micro-batch — and activation checkpointing
+  (forward recomputed during backward) doesn't corrupt the step structure
+
+The step is held open for post-step `log(loss=...)`. All hooks and patches are
+restored on `finish()`.
+
+```python
+from pytscope.auto import AutoProfiler
+
+prof = AutoProfiler("runs/exp1", model, optimizer, warmup=10)
+prof.start()
+for x, y in loader:
+    loss = loss_fn(model(x), y)
+    loss.backward()
+    optimizer.step()
+    optimizer.zero_grad()
+prof.finish()
+```
+
+<Callout type="warn" title="One forward/backward per step">
+  `AutoProfiler` assumes one forward and one backward pass per optimizer
+  step. If your loop does something more exotic — multiple forwards per
+  step, custom accumulation it can't infer — use the manual `Profiler`
+  below for explicit control.
+</Callout>
+
+## Manual Profiler — explicit control
+
+`Profiler` gives you `step()` / `mark()` / `log()` primitives and an
+`iter_data()` wrapper that times your dataloader directly:
+
+```python
+from pytscope import Profiler
+
+with Profiler("runs/exp1") as prof:
+    for batch in prof.iter_data(loader):
+        with prof.step():
+            with prof.mark("forward"):
+                loss = loss_fn(model(batch.x), batch.y)
+            with prof.mark("backward"):
+                loss.backward()
+            with prof.mark("optimizer"):
+                optimizer.step()
+                optimizer.zero_grad()
+            prof.log(loss=loss.item(), grad_norm=grad_norm)
+```
+
+Use this path for gradient accumulation, multi-stage pipelines, JAX/TF loops,
+or anything where you want to draw the phase boundaries yourself.
+
+### Distributed capture
+
+```python
+with Profiler("runs/exp1", distributed=True) as prof:
+    ...
+```
+
+Each rank writes to `run_dir/rank{k}/`; `pytscope analyze` auto-detects
+multi-rank directories and aligns every rank on one timeline. See
+[Distributed](/docs/features/distributed).
+
+## Timing model
+
+Both paths use **integer nanoseconds** (`time.perf_counter_ns`) end-to-end and
+convert to seconds exactly once, at the step boundary — this avoids float
+catastrophic cancellation on sub-millisecond phases. Overhead is ~0.7 µs/step
+instrumented, ~3 µs/step including the JSONL write — small enough to leave on
+by default. The clock is injectable for deterministic tests, and the profiler
+is DDP rank-aware (non-zero ranks no-op by default in single-rank mode).
+
+A crash mid-run doesn't lose data — `__exit__` calls `finish()`, so every step
+recorded before the exception is intact and analyzable.

@@ -1,0 +1,83 @@
+---
+title: Distributed
+description: Multi-rank critical-path analysis — stragglers, load imbalance, pipeline bubbles, and exposed communication.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+`Profiler(distributed=True)` records every rank to `run_dir/rank{k}/`; the
+distributed analyzer aligns all ranks on one timeline and computes the
+critical path, communication fraction, sync skew, and load imbalance —
+`pytscope analyze` auto-detects multi-rank run directories.
+
+<Tabs items={['Straggler detection', 'Pipeline bubbles', 'Exposed communication']}>
+<Tab value="Straggler detection">
+
+A **statistical** straggler test — a binomial-persistence check for whether
+one rank is *consistently* the critical path, far beyond what chance would
+produce — not a fixed threshold that false-fires on normal variance.
+
+```text
+● DISTRIBUTED — 4 ranks, 60 aligned steps
+  wall lost to imbalance 18.6% · median sync skew 4.7 ms/step
+    rank 2:  12.0 ms ·  99% (z=+13.4)  <- straggler
+
+● FINDINGS (1)
+  [HIGH] Rank 2 is a persistent straggler  (DIST.STRAGGLER)
+        Rank 2 is the slowest rank in 99% of steps (expected 25% by
+        chance) — every other rank waits for it on the all-reduce.
+        -> Check rank 2's hardware: thermal throttling, a slower GPU,
+           NUMA placement, or an unbalanced data shard.
+```
+
+Rules: `DIST.STRAGGLER`, `DIST.LOAD_IMBALANCE`, `DIST.COMM_BOUND`.
+
+<Callout title="Reproduce it — real multi-process gloo, CPU only">
+```bash
+pip install "pytscope[torch]"
+python examples/ddp_gloo.py --ranks 4 --straggler-rank 2 \
+  && pytscope analyze runs/ddp_gloo
+```
+</Callout>
+
+</Tab>
+<Tab value="Pipeline bubbles">
+
+The pipeline-bubble analyzer measures the *achieved* bubble from a per-stage
+schedule and compares it to the inherent GPipe minimum, `(p-1)/(m+p-1)` —
+so `DIST.PIPELINE_BUBBLE` flags only **excess** bubble, the part you can
+actually recover. The closed form is reproduced exactly across `(p, m)`.
+
+</Tab>
+<Tab value="Exposed communication">
+
+Ingest a `torch.profiler` / Kineto trace (`analyze --trace`, or
+auto-detected `trace.json[.gz]` in the run directory) and compute — via exact
+interval arithmetic — how much collective communication overlaps compute vs.
+is *exposed* on the critical path.
+
+```text
+● COMMUNICATION OVERLAP — from kernel trace
+  comm 36.0 ms · overlapped 67% · exposed 12.0 ms (20% of wall)
+
+  [HIGH] Communication is not overlapped with compute  (DIST.EXPOSED_COMM)
+        Only 67% of your all-reduce is hidden behind compute.
+        -> Try DDP gradient bucketing, or increase per-GPU compute so
+           backward hides the all-reduce.
+```
+
+```bash
+pytscope analyze runs/job --trace trace.json   # from torch.profiler
+```
+
+</Tab>
+</Tabs>
+
+## Validated on real hardware
+
+Confirmed on a real multi-GPU NCCL run (Kaggle, 2× T4): straggler attribution
+was an exact pass (`z=14.1`, the injected rank named correctly), and
+exposed-comm was directionally confirmed plus surfaced a genuine finding about
+PCIe-only interconnects. See [Validation](/docs/validation) for the full
+report.

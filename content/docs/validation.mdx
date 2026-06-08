@@ -1,0 +1,54 @@
+---
+title: Validation
+description: What's proven, where, and how to reproduce it.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+pytscope makes quantitative claims — straggler attribution, exposed
+communication, MFU. This page summarizes what's been validated on real
+hardware and links to the full protocol and reports.
+
+## Real multi-GPU NCCL run (Kaggle, 2× T4)
+
+<Callout type="success" title="Straggler attribution — exact pass">
+  `DIST.STRAGGLER` named the injected rank correctly: z = 14.1, 100%
+  critical-path share vs. 50% expected by chance, 27.5% wall lost to
+  imbalance.
+</Callout>
+
+<Callout type="info" title="Exposed communication — directionally confirmed">
+  Plus a genuine finding about the hardware itself: on PCIe-only GPU pairs
+  (no NVLink) the all-reduce is link-bandwidth-bound, so absolute exposed-comm
+  time stays roughly constant across batch sizes. `DIST.EXPOSED_COMM`
+  correctly fired **HIGH** for both the small- and large-batch configs (72%
+  vs. 62% exposed, overlap improving in the predicted direction) — documented
+  as an interconnect-topology caveat.
+</Callout>
+
+Full report, raw console captures, and analysis:
+[`docs/validation-runs/2026-06-08-kaggle-2xT4/RESULTS.md`](https://github.com/Sumu004/pytscope/blob/main/docs/validation-runs/2026-06-08-kaggle-2xT4/RESULTS.md).
+
+## Reproduce it yourself — free, on Kaggle's 2× T4 tier
+
+[`docs/validation-runs/`](https://github.com/Sumu004/pytscope/tree/main/docs/validation-runs)
+ships a ready-to-run notebook (`kaggle_2xT4.ipynb`) plus step-by-step
+instructions that execute the full multi-GPU validation protocol — straggler
+attribution, exposed-comm overlap, MFU sanity — on **real NCCL/CUDA, for
+free**. No paid GPU rental needed.
+
+## What's exact vs. statistical
+
+| Claim | How it's validated |
+|-------|--------------------|
+| Pipeline-bubble closed form | Reproduced exactly across `(p, m)` — synthetic, deterministic |
+| Exposed-comm overlap math | Exact interval arithmetic, tested on synthetic traces with known answers; parser validated against a real `torch.profiler` export |
+| Efficiency budget identity | Line items sum *exactly* to measured wall time — no fudge factor |
+| Straggler detection | Statistical (binomial-persistence test against chance), confirmed on real hardware above |
+| AutoProfiler step structure | Tested under both gradient accumulation and activation checkpointing |
+
+## Status
+
+DDP is first-class today. FSDP and tensor parallelism are on the roadmap —
+see the [GitHub issues](https://github.com/Sumu004/pytscope/issues) for the
+current state.

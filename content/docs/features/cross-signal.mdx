@@ -1,0 +1,36 @@
+---
+title: Cross-signal
+description: The headline diagnostic — findings that only appear when several independent signals move together.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+Most profiling tools watch one axis at a time. pytscope's diagnosis engine
+reads loss, gradient norm, step time, and memory off the *same* per-step
+timeline, and looks for moments where several of them spike **together** —
+that co-occurrence is strong statistical evidence of a real event, not
+independent noise.
+
+```text
+● FINDINGS (1)
+  [HIGH] Correlated instability at steps 70–72  (CROSS.CORRELATED_INSTABILITY)
+        3 independent signals spike together (loss, grad_norm, step_time).
+        That co-occurrence is strong evidence of a real optimization
+        event — not noise.
+        -> Check your LR schedule and gradient clipping around steps 70–72.
+```
+
+<Callout title="Reproduce it">
+```bash
+python examples/cross_signal.py && pytscope analyze runs/cross
+```
+</Callout>
+
+## Why this matters
+
+A loss spike alone might be normal noise. A step-time spike alone might be a
+GC pause. But a loss spike, a gradient-norm spike, *and* a step-time spike on
+the same step — that's the signature of something concrete: an LR schedule
+boundary, a bad batch, gradient clipping kicking in, or a checkpoint/eval
+interrupting the loop. `CROSS.CORRELATED_INSTABILITY` exists precisely to
+surface that and point you at the step range to go inspect.

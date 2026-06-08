@@ -1,0 +1,24 @@
+---
+title: Convergence
+description: Loss and grad-norm trend, divergence (NaN/Inf), and robust local-window spike detection.
+---
+
+The convergence analyzer watches whatever scalars you log — typically `loss`
+and `grad_norm` — for the patterns that usually mean something is wrong with
+*training*, not just *throughput*:
+
+- **Trend** — is loss actually decreasing, plateauing, or diverging?
+- **Divergence** — `NaN` / `Inf` values, flagged immediately with the step
+  they first appeared on
+- **Spikes** — a robust local-window outlier test (not a fixed threshold)
+  that catches sudden jumps in loss or gradient norm without false-firing on
+  normal noise
+
+```python
+prof.log(loss=loss.item(), grad_norm=grad_norm)
+```
+
+Because convergence shares the timeline with timing and memory, a spike that
+*coincides* with a step-time or memory spike is promoted from "noise" to a
+[cross-signal finding](/docs/features/cross-signal) — that co-occurrence is
+strong evidence of a real optimization event.

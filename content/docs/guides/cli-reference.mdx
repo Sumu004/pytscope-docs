@@ -1,0 +1,41 @@
+---
+title: CLI reference
+description: Every analyze / diff flag, and what each report section means.
+---
+
+## `pytscope analyze`
+
+```bash
+pytscope analyze <run_dir> [options]
+```
+
+| Flag | What it does |
+|------|--------------|
+| `--trace <path>` | Ingest a `torch.profiler` / Kineto trace for exposed-communication analysis (auto-detects `trace.json[.gz]` in the run dir if omitted) |
+| `--flops-per-step` | Enable the efficiency budget / MFU section (requires FLOPs captured via `AutoProfiler(measure_flops=True)`) |
+| `--peak-tflops <n>` | Anchor MFU to an explicit hardware peak instead of the built-in GPU table |
+| `--color {auto,always,never}` | Force or disable ANSI color (also honors `NO_COLOR` / `FORCE_COLOR`); degrades to byte-identical plain text when piped |
+
+`analyze` auto-detects multi-rank run directories (`run_dir/rank{k}/`) and
+renders the [distributed](/docs/features/distributed) section automatically.
+
+## `pytscope diff`
+
+```bash
+pytscope diff <run_a> <run_b>
+```
+
+Compares two runs' provenance, configuration, and outcomes — useful for
+tracking down nondeterminism or confirming a change actually helped:
+
+- Diagnoses **nondeterminism** (same config, different outcomes)
+- Finds the **first divergence step** between two loss/metric curves, even
+  when the runs have different lengths
+- Reports a reproducibility summary alongside a metrics table
+
+## Exit codes & piping
+
+Every report degrades to byte-identical plain text when redirected to a file
+or piped (e.g. in CI) — nothing is ever written to disk beyond the run
+directory itself. `analyze` exits non-zero with a clear message ("No steps...")
+on an empty or missing run directory, so it's safe to script around.

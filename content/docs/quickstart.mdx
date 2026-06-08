@@ -1,0 +1,124 @@
+---
+title: Quickstart
+description: Install pytscope, instrument a loop, and read your first report.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Callout } from 'fumadocs-ui/components/callout';
+
+<Steps>
+<Step>
+
+## Install
+
+pytscope is pure Python with no required dependencies. PyTorch / Lightning /
+Hugging Face integrations are optional extras.
+
+```bash
+pip install pytscope
+```
+
+```bash
+pip install "pytscope[torch,lightning,huggingface]"
+```
+
+</Step>
+<Step>
+
+## Instrument your loop
+
+You have two options — pick whichever fits your codebase.
+
+<Tabs items={['AutoProfiler (recommended)', 'Manual Profiler', 'Lightning callback']}>
+  <Tab value="AutoProfiler (recommended)">
+
+Zero changes to your loop. `AutoProfiler` attaches PyTorch forward hooks, wraps
+`optimizer.step`, and patches collectives to capture the full phase timeline
+(data / forward / backward / optimizer / comm) automatically.
+
+```python
+from pytscope.auto import AutoProfiler
+
+prof = AutoProfiler("runs/exp1", model, optimizer, warmup=10)
+prof.start()
+for x, y in loader:                  # <- your loop, untouched
+    loss = loss_fn(model(x), y)
+    loss.backward()
+    optimizer.step(); optimizer.zero_grad()
+prof.finish()
+```
+
+  </Tab>
+  <Tab value="Manual Profiler">
+
+Use `Profiler` directly when you want explicit control over phase boundaries —
+e.g. gradient accumulation, activation checkpointing, or a non-PyTorch loop.
+
+```python
+from pytscope import Profiler
+
+with Profiler("runs/exp1") as prof:
+    for batch in prof.iter_data(loader):           # times the dataloader
+        with prof.step():
+            with prof.mark("forward"):
+                loss = loss_fn(model(batch.x), batch.y)
+            with prof.mark("backward"):
+                loss.backward()
+            with prof.mark("optimizer"):
+                optimizer.step()
+                optimizer.zero_grad()
+            prof.log(loss=loss.item())
+```
+
+  </Tab>
+  <Tab value="Lightning callback">
+
+```python
+from pytscope.integrations.lightning import PytscopeCallback
+
+trainer = Trainer(callbacks=[PytscopeCallback("runs/exp1")])
+trainer.fit(model)
+```
+
+A Hugging Face `Trainer` callback is also available — see
+[Integrations](/docs/guides/integrations).
+
+  </Tab>
+</Tabs>
+
+</Step>
+<Step>
+
+## Read the report
+
+```bash
+pytscope analyze runs/exp1
+pytscope diff runs/exp1 runs/exp2     # compare two runs
+```
+
+`analyze` prints a "hardware panel" report straight to your terminal — a
+colored `●` indicator per section, gradient meter bars, severity-ranked
+findings, and sparklines for step-time and loss trends. Nothing is ever
+written to disk beyond the run itself.
+
+<Callout type="info" title="No GPU? No problem">
+  Try it immediately with the bundled examples:
+
+  ```bash
+  python examples/manual_loop.py  && pytscope analyze runs/demo   # timing
+  python examples/cross_signal.py && pytscope analyze runs/cross  # cross-signal
+  ```
+</Callout>
+
+</Step>
+</Steps>
+
+## Next
+
+- **[Features](/docs/features)** — what each of the six lenses catches, and
+  how to read its report
+- **[Guides → CLI reference](/docs/guides/cli-reference)** — every `analyze` /
+  `diff` flag
+- **[Architecture](/docs/concepts/architecture)** — why one shared timeline is
+  the design's core idea

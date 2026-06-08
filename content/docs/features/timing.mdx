@@ -1,0 +1,44 @@
+---
+title: Timing
+description: Per-step attribution to data / forward / backward / optimizer, with rules for the most common bottlenecks.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+The timing analyzer attributes every step to its phases — `data`, `forward`,
+`backward`, `optimizer`, and (when captured) `comm` — using integer-nanosecond
+timing end to end, and reports medians, p95s, and step-time variance (CV).
+
+```bash
+pytscope analyze runs/exp1
+```
+
+```text
+● TIMING — 95 steps · 23.1 ms/step · 43.3 steps/s
+  data       ████████████████░░░░░░░░░░░░░░  52.0%
+  forward    █████████░░░░░░░░░░░░░░░░░░░░░  17.3%
+  backward   ██████████████░░░░░░░░░░░░░░░░  26.0%
+  optimizer  █░░░░░░░░░░░░░░░░░░░░░░░░░░░░░   4.3%
+
+● FINDINGS (1)
+  [HIGH] Input pipeline is a bottleneck  (TIMING.DATALOADER_BOUND)
+        52% of step time is spent fetching data. The accelerator is
+        stalling on the dataloader.
+        -> Raise DataLoader num_workers, set persistent_workers=True
+           and pin_memory=True, or move heavy transforms off the hot path.
+```
+
+## What it catches
+
+| Rule | Fires when | Fix it points at |
+|------|-----------|------------------|
+| `TIMING.DATALOADER_BOUND` | `data` dominates step time | `num_workers`, `persistent_workers`, `pin_memory`, lighter transforms |
+| `TIMING.BACKWARD_HEAVY` | `backward` is disproportionately slow | gradient checkpointing trade-offs, fused kernels, mixed precision |
+| `TIMING.OPTIMIZER_HEAVY` | `optimizer.step` dominates | fused/foreach optimizers, larger batch to amortize |
+| `TIMING.HIGH_JITTER` | step time has high coefficient of variation | host-side stalls, page faults, thermal throttling, uneven shards |
+
+<Callout title="Reproduce it">
+```bash
+python examples/manual_loop.py && pytscope analyze runs/demo
+```
+</Callout>

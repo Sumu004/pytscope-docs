@@ -1,0 +1,36 @@
+---
+title: Overview
+description: One aligned timeline, six lenses — each backed by a real, tested analyzer.
+---
+
+import { Card, Cards } from 'fumadocs-ui/components/card';
+
+Every signal pytscope captures lands on the same per-step timeline
+(`StepRecord`s in a `RunStore`). Each analyzer reads that one stream and
+returns a typed summary; the diagnosis engine turns summaries into ranked
+`Finding`s — each with a severity, a plain-language explanation, and a
+concrete fix.
+
+<Cards>
+  <Card title="Timing" href="/docs/features/timing">
+    Dataloader stalls, slow backward/optimizer, step-time jitter.
+  </Card>
+  <Card title="Memory" href="/docs/features/memory">
+    Peak usage, fragmentation, leaks — CUDA and Apple MPS.
+  </Card>
+  <Card title="Convergence" href="/docs/features/convergence">
+    Loss / grad-norm divergence and robust spike detection.
+  </Card>
+  <Card title="Cross-signal" href="/docs/features/cross-signal">
+    Findings that only appear when several signals move together.
+  </Card>
+  <Card title="Distributed" href="/docs/features/distributed">
+    Stragglers, load imbalance, pipeline bubbles, exposed communication.
+  </Card>
+  <Card title="Efficiency budget" href="/docs/features/efficiency-budget">
+    An exact wall-time decomposition anchored to MFU.
+  </Card>
+</Cards>
+
+For the full list of finding codes — what triggers each one and what to do —
+see the [Diagnostics reference](/docs/concepts/diagnostics-reference).

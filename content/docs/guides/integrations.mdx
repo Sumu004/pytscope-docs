@@ -1,0 +1,60 @@
+---
+title: Integrations
+description: One-line PyTorch Lightning and Hugging Face Trainer callbacks.
+---
+
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Callout } from 'fumadocs-ui/components/callout';
+
+If you're already on Lightning or Hugging Face `Trainer`, drop in the
+matching callback — no loop changes required. Both wrap `AutoProfiler`
+internally and are DDP rank-aware (non-zero ranks no-op by default).
+
+<Tabs items={['PyTorch Lightning', 'Hugging Face Trainer']}>
+<Tab value="PyTorch Lightning">
+
+```python
+from pytscope.integrations.lightning import PytscopeCallback
+
+trainer = Trainer(
+    max_epochs=10,
+    callbacks=[PytscopeCallback("runs/exp1")],
+)
+trainer.fit(model)
+```
+
+```bash
+pytscope analyze runs/exp1
+```
+
+</Tab>
+<Tab value="Hugging Face Trainer">
+
+```python
+from pytscope.integrations.huggingface import PytscopeCallback
+
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    callbacks=[PytscopeCallback("runs/exp1")],
+)
+trainer.train()
+```
+
+```bash
+pytscope analyze runs/exp1
+```
+
+</Tab>
+</Tabs>
+
+<Callout title="Install the extra">
+```bash
+pip install "pytscope[lightning]"   # or [huggingface]
+```
+</Callout>
+
+Both callbacks pass through every `AutoProfiler` keyword argument
+(`warmup`, `measure_flops`, `collect_memory`, ...), so anything in
+[Instrumenting your loop](/docs/guides/instrumenting-your-loop) applies here
+too.

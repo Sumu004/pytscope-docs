@@ -1,38 +1,29 @@
 ---
 title: Changelog
-description: What's new in each pytscope release.
+description: What's new in pytscope.
 full: true
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
 
 <Callout title="Source of truth">
-  This page is a quick summary. The full, detailed changelog lives in
+  This page is a quick summary of the current release. The full, detailed,
+  dated changelog lives in
   [`CHANGELOG.md`](https://github.com/Sumu004/pytscope/blob/main/CHANGELOG.md)
   (follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
   [Semantic Versioning](https://semver.org/spec/v2.0.0.html)) — see it or the
-  [GitHub releases](https://github.com/Sumu004/pytscope/releases) for every
-  detail.
+  [GitHub releases](https://github.com/Sumu004/pytscope/releases) for the
+  complete, dated history.
 </Callout>
 
-## [0.2.1] — 2026-06-08
-
-Renamed the project from `trainscope` to `pytscope` (`trainscope` and
-`tscope` were already taken on PyPI). Import path, CLI command, PyPI
-distribution, and GitHub repo are all `pytscope` now — no functional changes.
-
-## [0.2.0] — 2026-06-08
+## v0.2.1
 
 Amber-LED "hardware panel" terminal reports, a Training Efficiency Budget
 anchored to MFU, exposed-communication analysis from `torch.profiler` traces,
 zero-touch `AutoProfiler` instrumentation, and a full distributed vertical
-(straggler detection, load imbalance, pipeline bubbles). Validated on a real
-multi-GPU NCCL run (Kaggle 2× T4) — see [Validation](/docs/validation). Also
-fixed a Windows CLI crash on unicode output and an MFU device-selection bug.
+(straggler detection, load imbalance, pipeline bubbles) — on top of the core
+`Profiler`, the timing/memory/convergence/cross-signal analyzers,
+Lightning/Hugging Face integrations, and the `analyze`/`diff` CLI.
 
-## [0.1.0] — 2026-06-06
-
-First public beta: the `Profiler` core, one telemetry backbone feeding four
-analysis verticals (timing, memory, convergence, cross-signal) plus
-reproducibility diffing, Lightning/Hugging Face integrations, and the
-`analyze`/`diff` CLI.
+Validated on a real multi-GPU NCCL run (Kaggle 2× T4) — see
+[Validation](/docs/validation).
